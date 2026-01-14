@@ -4,7 +4,7 @@ import { getBestDayOfWeek, calculateBestStreak, getCompletionStats } from '../..
 import { Heatmap } from './charts/Heatmap';
 import { CompletionBarChart } from './charts/CompletionBarChart';
 import { CompletionPieChart } from './charts/CompletionPieChart';
-import { Calendar, BarChart3, PieChart, TrendingUp, Trophy, CalendarDays } from 'lucide-react';
+import { Calendar, BarChart3, PieChart, TrendingUp, Trophy, CalendarDays, Info } from 'lucide-react';
 import { subDays } from 'date-fns';
 
 export const AnalyticsDashboard: React.FC = () => {
@@ -123,9 +123,17 @@ export const AnalyticsDashboard: React.FC = () => {
             {/* Summary Cards */}
             <div className="grid grid-cols-3 gap-4">
                 <div className="bg-[#161821] p-4 rounded-2xl border border-white/5 flex flex-col gap-1">
-                    <div className="flex items-center gap-2 text-gray-400 text-xs font-medium uppercase">
-                        <TrendingUp className="w-3 h-3 text-emerald-400" />
-                        Tasa de Éxito
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-gray-400 text-xs font-medium uppercase">
+                            <TrendingUp className="w-3 h-3 text-emerald-400" />
+                            Tasa de Éxito
+                        </div>
+                        <div className="group relative">
+                            <Info className="w-3 h-3 text-gray-500 hover:text-gray-300 cursor-help transition-colors" />
+                            <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-48 p-2 bg-black/90 text-white text-xs rounded-lg border border-white/10 shadow-xl z-50">
+                                Porcentaje de días en los que completaste tus hábitos en el período seleccionado.
+                            </div>
+                        </div>
                     </div>
                     <div className="text-2xl font-bold text-white">
                         {Math.round(completionInfo.rate)}%
@@ -136,9 +144,17 @@ export const AnalyticsDashboard: React.FC = () => {
                 </div>
 
                 <div className="bg-[#161821] p-4 rounded-2xl border border-white/5 flex flex-col gap-1">
-                    <div className="flex items-center gap-2 text-gray-400 text-xs font-medium uppercase">
-                        <Trophy className="w-3 h-3 text-yellow-400" />
-                        Mejor Racha
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-gray-400 text-xs font-medium uppercase">
+                            <Trophy className="w-3 h-3 text-yellow-400" />
+                            Mejor Racha
+                        </div>
+                        <div className="group relative">
+                            <Info className="w-3 h-3 text-gray-500 hover:text-gray-300 cursor-help transition-colors" />
+                            <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-48 p-2 bg-black/90 text-white text-xs rounded-lg border border-white/10 shadow-xl z-50">
+                                Mayor número de días consecutivos completando el hábito seleccionado (o el mejor entre todos).
+                            </div>
+                        </div>
                     </div>
                     <div className="text-2xl font-bold text-white">
                         {bestStreakVal} <span className="text-sm font-normal text-gray-500">días</span>
@@ -149,9 +165,17 @@ export const AnalyticsDashboard: React.FC = () => {
                 </div>
 
                 <div className="bg-[#161821] p-4 rounded-2xl border border-white/5 flex flex-col gap-1">
-                    <div className="flex items-center gap-2 text-gray-400 text-xs font-medium uppercase">
-                        <CalendarDays className="w-3 h-3 text-blue-400" />
-                        Mejor Día
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-gray-400 text-xs font-medium uppercase">
+                            <CalendarDays className="w-3 h-3 text-blue-400" />
+                            Mejor Día
+                        </div>
+                        <div className="group relative">
+                            <Info className="w-3 h-3 text-gray-500 hover:text-gray-300 cursor-help transition-colors" />
+                            <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-48 p-2 bg-black/90 text-white text-xs rounded-lg border border-white/10 shadow-xl z-50">
+                                Día de la semana con mayor frecuencia de completación de hábitos.
+                            </div>
+                        </div>
                     </div>
                     <div className="text-lg font-bold text-white capitalize truncate" title={bestDay}>
                         {bestDay}
