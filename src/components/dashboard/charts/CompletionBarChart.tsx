@@ -24,6 +24,15 @@ export const CompletionBarChart: React.FC<CompletionBarChartProps> = ({ habit, r
     // Calculate Data
     let totalCompletedSum = 0;
 
+    // Get unique categories from active habits
+    const categoryMap = new Map<string, { id: string; name: string; color: string }>();
+    activeHabits.forEach(h => {
+        const cat = categories.find(c => c.id === h.categoryId);
+        if (cat && !categoryMap.has(cat.id)) {
+            categoryMap.set(cat.id, { id: cat.id, name: cat.name, color: cat.color });
+        }
+    });
+
     const data = days.map(day => {
         const dateStr = format(day, 'yyyy-MM-dd');
         const row: any = {
@@ -43,15 +52,23 @@ export const CompletionBarChart: React.FC<CompletionBarChartProps> = ({ habit, r
             row.value = Math.round(value);
             totalCompletedSum += row.value;
         } else {
-            // Aggregate Stacked View (Count of habits)
+            // Aggregate Stacked View - GROUP BY CATEGORY
             let dailyCount = 0;
+
+            // Initialize category counts
+            categoryMap.forEach((cat) => {
+                row[cat.id] = 0;
+            });
+
+            // Count completed habits per category
             activeHabits.forEach(h => {
                 const val = logs[dateStr]?.[h.id] || 0;
                 if (isCompleted(h, val)) {
-                    row[h.id] = 1; // 1 Unit height for this habit
-                    dailyCount++;
-                } else {
-                    row[h.id] = 0;
+                    const cat = categories.find(c => c.id === h.categoryId);
+                    if (cat) {
+                        row[cat.id] = (row[cat.id] || 0) + 1; // Increment category count
+                        dailyCount++;
+                    }
                 }
             });
             totalCompletedSum += dailyCount;
@@ -101,14 +118,14 @@ export const CompletionBarChart: React.FC<CompletionBarChartProps> = ({ habit, r
                         // Single Bar
                         <Bar dataKey="value" radius={[4, 4, 0, 0]} fill={getCategoryColor(habit)} name="Cumplimiento %" />
                     ) : (
-                        // Stacked Bars per habit
-                        activeHabits.map((h) => (
+                        // Stacked Bars per CATEGORY (not per habit)
+                        Array.from(categoryMap.values()).map((cat) => (
                             <Bar
-                                key={h.id}
-                                dataKey={h.id}
+                                key={cat.id}
+                                dataKey={cat.id}
                                 stackId="a"
-                                fill={getCategoryColor(h)}
-                                name={h.name}
+                                fill={cat.color}
+                                name={cat.name}
                                 radius={[0, 0, 0, 0]}
                             />
                         ))
