@@ -17,7 +17,7 @@ export const DateSelector: React.FC<DateSelectorProps> = ({ selectedDate, onDate
     const isToday = isSameDay(selectedDate, new Date());
 
     return (
-        <div className="flex items-center justify-between bg-card rounded-2xl p-2 border border-white/5 mb-6">
+        <div className="relative flex items-center justify-center bg-card rounded-2xl p-2 border border-white/5 mb-6 min-h-[80px]">
             <div className="flex items-center gap-2">
                 <Button variant="ghost" size="icon" onClick={handlePrev}>
                     <ChevronLeft className="h-5 w-5" />
@@ -32,20 +32,17 @@ export const DateSelector: React.FC<DateSelectorProps> = ({ selectedDate, onDate
                     </span>
                 </div>
 
-                <Button variant="ghost" size="icon" onClick={handleNext} disabled={isToday /* preventing future? User req says "Register past days", usually future is allowed but let's allow it */}>
-                    {/* Ops, I disabled future above, user didn't explicitly forbid future but habit completion in future is weird. 
-              Let's re-read: "Registrar cumplimiento diario... hoy y días pasados".
-              Ideally future logging is weird, but planning is okay. I'll enable it but maybe styling indicates it's future. 
-              Actually, let's enable it as user might want to see calendar. 
-           */}
+                <Button variant="ghost" size="icon" onClick={handleNext}>
                     <ChevronRight className="h-5 w-5" />
                 </Button>
             </div>
 
             {!isToday && (
-                <Button variant="secondary" size="sm" onClick={handleToday} className="mr-2">
-                    Volver a Hoy
-                </Button>
+                <div className="absolute right-2 sm:right-4">
+                    <Button variant="secondary" size="sm" onClick={handleToday} className="text-xs sm:text-sm px-2 sm:px-3 h-8 sm:h-9">
+                        <span className="hidden sm:inline">Volver a </span>Hoy
+                    </Button>
+                </div>
             )}
         </div>
     );

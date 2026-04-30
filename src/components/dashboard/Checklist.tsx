@@ -24,7 +24,7 @@ export const Checklist: React.FC<ChecklistProps> = ({ selectedDate }) => {
                 </Button>
             </div>
 
-            <div className="space-y-4">
+            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
                 {habits.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-48 text-gray-500 border-2 border-dashed border-gray-800 rounded-2xl">
                         <p>No tienes hábitos aún.</p>

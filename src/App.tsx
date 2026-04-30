@@ -37,8 +37,6 @@ function App() {
                             Analytics
                         </button>
                     </nav>
-
-                    <div className="w-8" /> {/* Spacer for balance */}
                 </div>
             </header>
 
