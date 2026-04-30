@@ -3,10 +3,10 @@ import {
   PlusCircle, ShoppingBag, Car, UtensilsCrossed, Film,
   Heart, BookOpen, Smartphone, Zap, MoreHorizontal,
   Trash2, X, TrendingDown, Wallet, RefreshCw, Calendar,
-  Target, ChevronRight,
+  Target,
 } from 'lucide-react';
 import {
-  format, isToday, isThisWeek, isThisMonth, parseISO,
+  format, isToday, isThisMonth, parseISO,
   startOfMonth, endOfMonth, eachDayOfInterval, subMonths, isSameMonth,
 } from 'date-fns';
 import { es } from 'date-fns/locale';
