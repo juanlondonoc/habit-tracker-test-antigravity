@@ -58,7 +58,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const id = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      const amount = parseFloat(body.amount) || 0;
+      let amountStr = String(body.amount || '0');
+      // Handle Spanish/Colombian format: 470.000,00 -> 470000.00
+      amountStr = amountStr.replace(/\./g, '').replace(',', '.');
+      const amount = parseFloat(amountStr) || 0;
       const merchant = body.merchant || 'Desconocido';
       const date = body.date ? new Date(body.date) : new Date();
       const currency = body.currency || 'COP';
