@@ -1,17 +1,26 @@
-import { useState } from 'react';
-import { SignedIn, SignedOut, SignIn, UserButton } from '@clerk/clerk-react';
+import { useState, useEffect } from 'react';
+import { SignedIn, SignedOut, SignIn, UserButton, useAuth } from '@clerk/clerk-react';
 import { DateSelector } from './components/dashboard/DateSelector';
 import { Checklist } from './components/dashboard/Checklist';
 import { Activity } from 'lucide-react';
 import { cn } from './lib/utils';
 import { AnalyticsDashboard } from './components/dashboard/AnalyticsDashboard';
 import { TransactionsDashboard } from './components/dashboard/TransactionsDashboard';
+import { useHabitStore } from './store/useHabitStore';
 
 type View = 'dashboard' | 'gastos';
 
 function App() {
+    const { isLoaded, userId } = useAuth();
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [view, setView] = useState<View>('dashboard');
+
+    // Re-fetch data whenever the user ID changes or Clerk finishes loading
+    useEffect(() => {
+        if (isLoaded && userId) {
+            useHabitStore.persist.rehydrate();
+        }
+    }, [isLoaded, userId]);
 
     const navItems: { id: View; label: string }[] = [
         { id: 'dashboard', label: 'Hábitos' },
