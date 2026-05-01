@@ -121,8 +121,8 @@ export const AnalyticsDashboard: React.FC = () => {
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-3 gap-4">
-                <div className="bg-[#161821] p-4 rounded-2xl border border-white/5 flex flex-col gap-1">
+            <div className="flex overflow-x-auto gap-4 pb-2 snap-x snap-mandatory custom-scrollbar">
+                <div className="shrink-0 w-[160px] sm:w-auto sm:flex-1 bg-[#161821] p-4 rounded-2xl border border-white/5 flex flex-col gap-1 snap-start">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-gray-400 text-xs font-medium uppercase">
                             <TrendingUp className="w-3 h-3 text-emerald-400" />
@@ -143,7 +143,7 @@ export const AnalyticsDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="bg-[#161821] p-4 rounded-2xl border border-white/5 flex flex-col gap-1">
+                <div className="shrink-0 w-[160px] sm:w-auto sm:flex-1 bg-[#161821] p-4 rounded-2xl border border-white/5 flex flex-col gap-1 snap-start">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-gray-400 text-xs font-medium uppercase">
                             <Trophy className="w-3 h-3 text-yellow-400" />
@@ -164,7 +164,7 @@ export const AnalyticsDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="bg-[#161821] p-4 rounded-2xl border border-white/5 flex flex-col gap-1">
+                <div className="shrink-0 w-[160px] sm:w-auto sm:flex-1 bg-[#161821] p-4 rounded-2xl border border-white/5 flex flex-col gap-1 snap-start">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-gray-400 text-xs font-medium uppercase">
                             <CalendarDays className="w-3 h-3 text-blue-400" />

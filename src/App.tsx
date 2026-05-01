@@ -7,15 +7,14 @@ import { cn } from './lib/utils';
 import { AnalyticsDashboard } from './components/dashboard/AnalyticsDashboard';
 import { TransactionsDashboard } from './components/dashboard/TransactionsDashboard';
 
-type View = 'dashboard' | 'analytics' | 'gastos';
+type View = 'dashboard' | 'gastos';
 
 function App() {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [view, setView] = useState<View>('dashboard');
 
     const navItems: { id: View; label: string }[] = [
-        { id: 'dashboard', label: 'Dashboard' },
-        { id: 'analytics', label: 'Analytics' },
+        { id: 'dashboard', label: 'Hábitos' },
         { id: 'gastos', label: 'Gastos' },
     ];
 
@@ -55,10 +54,7 @@ function App() {
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
                         {/* Left Column */}
-                        <div className={cn(
-                            "flex flex-col h-full gap-6",
-                            view === 'analytics' ? "hidden" : "lg:col-span-4 xl:col-span-5"
-                        )}>
+                        <div className="flex flex-col h-full gap-6 lg:col-span-4 xl:col-span-5">
                             <DateSelector selectedDate={selectedDate} onDateChange={setSelectedDate} />
                             <div className="flex-1 overflow-hidden">
                                 <Checklist selectedDate={selectedDate} />
@@ -66,10 +62,7 @@ function App() {
                         </div>
 
                         {/* Right Column: Analytics */}
-                        <div className={cn(
-                            "h-full overflow-y-auto custom-scrollbar",
-                            view === 'dashboard' ? "hidden lg:block lg:col-span-8 xl:col-span-7" : "lg:col-span-12"
-                        )}>
+                        <div className="h-full overflow-y-auto custom-scrollbar lg:col-span-8 xl:col-span-7">
                             <AnalyticsDashboard />
                         </div>
                     </div>
