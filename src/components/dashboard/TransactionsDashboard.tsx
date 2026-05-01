@@ -5,6 +5,7 @@ import {
   Trash2, X, TrendingDown, Wallet, RefreshCw, Calendar,
   Target,
 } from 'lucide-react';
+import { useAuth } from '@clerk/clerk-react';
 import {
   format, isToday, isThisMonth, parseISO,
   startOfMonth, endOfMonth, eachDayOfInterval, subMonths, isSameMonth,
@@ -47,6 +48,7 @@ interface AddModalProps {
 }
 
 function AddModal({ onClose, onAdded }: AddModalProps) {
+  const { getToken } = useAuth();
   const [form, setForm] = useState({
     amount: '',
     merchant: '',
@@ -65,9 +67,13 @@ function AddModal({ onClose, onAdded }: AddModalProps) {
     if (!form.amount || !form.merchant) { setError('Completa monto y comercio'); return; }
     setLoading(true);
     try {
+      const token = await getToken();
       const res = await fetch('/api/transactions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ ...form, source: 'manual', token: SECRET, date: new Date().toISOString() }),
       });
       const data = await res.json();
@@ -148,6 +154,7 @@ function AddModal({ onClose, onAdded }: AddModalProps) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export function TransactionsDashboard() {
+  const { getToken } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -158,16 +165,20 @@ export function TransactionsDashboard() {
   const [tempBudget, setTempBudget] = useState(budget.toString());
 
   useEffect(() => {
-    fetch('/api/state?key=habitcore_budget')
-      .then(r => r.json())
-      .then(d => {
-        if (d.value) {
-          const val = parseFloat(d.value);
-          if (!isNaN(val)) setBudget(val);
-        }
+    getToken().then(token => {
+      fetch('/api/state?key=habitcore_budget', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       })
-      .catch(console.error);
-  }, []);
+        .then(r => r.json())
+        .then(d => {
+          if (d.value) {
+            const val = parseFloat(d.value);
+            if (!isNaN(val)) setBudget(val);
+          }
+        })
+        .catch(console.error);
+    });
+  }, [getToken]);
 
   // Filters
   const [filter, setFilter] = useState<'current' | 'prev' | '7d'>('current');
@@ -175,7 +186,10 @@ export function TransactionsDashboard() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/transactions');
+      const token = await getToken();
+      const res = await fetch('/api/transactions', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       const data = await res.json();
       setTransactions(Array.isArray(data) ? data : []);
     } catch {
@@ -192,9 +206,13 @@ export function TransactionsDashboard() {
     setBudget(nb);
     setIsEditingBudget(false);
     
+    const token = await getToken();
     await fetch('/api/state', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
       body: JSON.stringify({ key: 'habitcore_budget', value: nb.toString(), token: SECRET })
     }).catch(console.error);
   };
@@ -202,9 +220,13 @@ export function TransactionsDashboard() {
   async function deleteTx(id: string) {
     setDeleting(id);
     try {
+      const token = await getToken();
       await fetch('/api/transactions', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ id, token: SECRET }),
       });
       setTransactions((prev) => prev.filter((t) => t.id !== id));

@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
+import { verifyToken } from '@clerk/backend';
 
 function cors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -7,17 +8,34 @@ function cors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
+async function authenticate(req: VercelRequest) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const token = authHeader.split(' ')[1];
+  try {
+    const payload = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY,
+    });
+    return payload.sub; // user_id
+  } catch (e) {
+    console.error('Token verification failed', e);
+    return null;
+  }
+}
+
 async function getDB() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL not set');
   const sql = neon(url);
 
-  // Create table for key-value state storage
+  // Update table for multi-user state storage
   await sql`
     CREATE TABLE IF NOT EXISTS app_state (
-      key TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL DEFAULT 'legacy_user',
+      key TEXT NOT NULL,
       value TEXT NOT NULL,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, key)
     )
   `;
   return sql;
@@ -27,7 +45,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const SECRET = process.env.TRANSACTIONS_SECRET;
+  const userId = await authenticate(req);
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid or missing Clerk token' });
+  }
 
   try {
     const sql = await getDB();
@@ -38,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Missing key' });
       }
 
-      const rows = await sql`SELECT value FROM app_state WHERE key = ${key}`;
+      const rows = await sql`SELECT value FROM app_state WHERE key = ${key} AND user_id = ${userId}`;
       if (rows.length === 0) {
         return res.status(200).json({ value: null });
       }
@@ -48,18 +69,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
-      if (SECRET && body.token !== SECRET) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
       if (!body.key || typeof body.value !== 'string') {
         return res.status(400).json({ error: 'Missing key or value' });
       }
 
       await sql`
-        INSERT INTO app_state (key, value, updated_at)
-        VALUES (${body.key}, ${body.value}, NOW())
-        ON CONFLICT (key) DO UPDATE 
+        INSERT INTO app_state (user_id, key, value, updated_at)
+        VALUES (${userId}, ${body.key}, ${body.value}, NOW())
+        ON CONFLICT (user_id, key) DO UPDATE 
         SET value = EXCLUDED.value, updated_at = NOW()
       `;
 
@@ -67,17 +84,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'DELETE') {
-      const { key, token } = req.query;
+      const { key } = req.query;
       
-      if (SECRET && token !== SECRET) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
       if (!key || typeof key !== 'string') {
         return res.status(400).json({ error: 'Missing key' });
       }
 
-      await sql`DELETE FROM app_state WHERE key = ${key}`;
+      await sql`DELETE FROM app_state WHERE key = ${key} AND user_id = ${userId}`;
       return res.status(200).json({ success: true });
     }
 

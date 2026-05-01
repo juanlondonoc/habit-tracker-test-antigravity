@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
+import { verifyToken } from '@clerk/backend';
 
 function cors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -7,15 +8,30 @@ function cors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
+async function authenticate(req: VercelRequest) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const token = authHeader.split(' ')[1];
+  try {
+    const payload = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY,
+    });
+    return payload.sub; // user_id
+  } catch (e) {
+    return null;
+  }
+}
+
 async function getDB() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL not set');
   const sql = neon(url);
 
-  // Create table if it doesn't exist
+  // Create table if it doesn't exist, and add user_id for multi-user support
   await sql`
     CREATE TABLE IF NOT EXISTS transactions (
       id          TEXT PRIMARY KEY,
+      user_id     TEXT NOT NULL DEFAULT 'legacy_user',
       amount      NUMERIC NOT NULL,
       merchant    TEXT NOT NULL,
       date        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -34,15 +50,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const SECRET = process.env.TRANSACTIONS_SECRET;
+  let userId = await authenticate(req);
 
   try {
     const sql = await getDB();
 
     // ── GET ────────────────────────────────────────────────────────────────────
     if (req.method === 'GET') {
+      if (!userId) return res.status(401).json({ error: 'Unauthorized: Invalid or missing Clerk token' });
+
       const rows = await sql`
         SELECT id, amount::float, merchant, date, currency, category, note, source
         FROM transactions
+        WHERE user_id = ${userId}
         ORDER BY date DESC
         LIMIT 500
       `;
@@ -53,8 +73,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
-      if (SECRET && body.token !== SECRET) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      // Hybrid Auth: If no Clerk token, check if the request has the TRANSACTIONS_SECRET
+      if (!userId) {
+        if (SECRET && body.token === SECRET) {
+          // Allowed via Secret (for Apple Pay shortcut). Require a user_id to be passed, or fallback.
+          userId = body.user_id || 'legacy_user';
+        } else {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
       }
 
       const id = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -70,8 +96,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const source = body.source || 'apple_pay';
 
       await sql`
-        INSERT INTO transactions (id, amount, merchant, date, currency, category, note, source)
-        VALUES (${id}, ${amount}, ${merchant}, ${date}, ${currency}, ${category}, ${note}, ${source})
+        INSERT INTO transactions (id, user_id, amount, merchant, date, currency, category, note, source)
+        VALUES (${id}, ${userId}, ${amount}, ${merchant}, ${date}, ${currency}, ${category}, ${note}, ${source})
       `;
 
       const tx = { id, amount, merchant, date: date.toISOString(), currency, category, note, source };
@@ -80,15 +106,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ── DELETE ─────────────────────────────────────────────────────────────────
     if (req.method === 'DELETE') {
+      if (!userId) return res.status(401).json({ error: 'Unauthorized: Invalid or missing Clerk token' });
+
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-
-      if (SECRET && body.token !== SECRET) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
       if (!body.id) return res.status(400).json({ error: 'Missing id' });
 
-      await sql`DELETE FROM transactions WHERE id = ${body.id}`;
+      await sql`DELETE FROM transactions WHERE id = ${body.id} AND user_id = ${userId}`;
       return res.status(200).json({ success: true });
     }
 

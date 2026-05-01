@@ -19,10 +19,22 @@ const DEFAULT_CATEGORIES: Category[] = [
 
 const SECRET = import.meta.env.VITE_TRANSACTIONS_SECRET || '';
 
+const getToken = async () => {
+    // @ts-ignore
+    if (window.Clerk && window.Clerk.session) {
+        // @ts-ignore
+        return await window.Clerk.session.getToken();
+    }
+    return null;
+};
+
 const neonStorage = {
     getItem: async (name: string): Promise<string | null> => {
         try {
-            const res = await fetch(`/api/state?key=${name}`);
+            const token = await getToken();
+            const res = await fetch(`/api/state?key=${name}`, {
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            });
             const data = await res.json();
             return data.value || null;
         } catch {
@@ -31,9 +43,13 @@ const neonStorage = {
     },
     setItem: async (name: string, value: string): Promise<void> => {
         try {
+            const token = await getToken();
             await fetch('/api/state', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify({ key: name, value, token: SECRET })
             });
         } catch (e) {
@@ -42,7 +58,11 @@ const neonStorage = {
     },
     removeItem: async (name: string): Promise<void> => {
         try {
-            await fetch(`/api/state?key=${name}&token=${SECRET}`, { method: 'DELETE' });
+            const token = await getToken();
+            await fetch(`/api/state?key=${name}&token=${SECRET}`, { 
+                method: 'DELETE',
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            });
         } catch (e) {
             console.error('Failed to delete from neon', e);
         }

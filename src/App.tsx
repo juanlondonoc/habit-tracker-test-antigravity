@@ -1,5 +1,5 @@
-// Triggering redeploy for env vars
 import { useState } from 'react';
+import { SignedIn, SignedOut, SignIn, UserButton } from '@clerk/clerk-react';
 import { DateSelector } from './components/dashboard/DateSelector';
 import { Checklist } from './components/dashboard/Checklist';
 import { Activity } from 'lucide-react';
@@ -44,29 +44,42 @@ function App() {
                             </button>
                         ))}
                     </nav>
+                    <div className="ml-2 flex items-center">
+                        <SignedIn>
+                            <UserButton afterSignOutUrl="/" appearance={{ elements: { userButtonAvatarBox: "w-8 h-8" } }} />
+                        </SignedIn>
+                    </div>
                 </div>
             </header>
 
             {/* Main Content */}
             <main className="container mx-auto p-4 lg:p-6 min-h-[calc(100vh-64px)]">
-                {view === 'gastos' ? (
-                    <TransactionsDashboard />
-                ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
-                        {/* Left Column */}
-                        <div className="flex flex-col h-full gap-6 lg:col-span-4 xl:col-span-5">
-                            <DateSelector selectedDate={selectedDate} onDateChange={setSelectedDate} />
-                            <div className="flex-1 overflow-hidden">
-                                <Checklist selectedDate={selectedDate} />
+                <SignedOut>
+                    <div className="flex items-center justify-center h-full pt-10">
+                        <SignIn routing="hash" />
+                    </div>
+                </SignedOut>
+                
+                <SignedIn>
+                    {view === 'gastos' ? (
+                        <TransactionsDashboard />
+                    ) : (
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
+                            {/* Left Column */}
+                            <div className="flex flex-col h-full gap-6 lg:col-span-4 xl:col-span-5">
+                                <DateSelector selectedDate={selectedDate} onDateChange={setSelectedDate} />
+                                <div className="flex-1 overflow-hidden">
+                                    <Checklist selectedDate={selectedDate} />
+                                </div>
+                            </div>
+
+                            {/* Right Column: Analytics */}
+                            <div className="h-full overflow-y-auto custom-scrollbar lg:col-span-8 xl:col-span-7">
+                                <AnalyticsDashboard />
                             </div>
                         </div>
-
-                        {/* Right Column: Analytics */}
-                        <div className="h-full overflow-y-auto custom-scrollbar lg:col-span-8 xl:col-span-7">
-                            <AnalyticsDashboard />
-                        </div>
-                    </div>
-                )}
+                    )}
+                </SignedIn>
             </main>
         </div>
     );
