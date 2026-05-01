@@ -38,6 +38,18 @@ async function getDB() {
       PRIMARY KEY (user_id, key)
     )
   `;
+
+  // Ensure the column exists if the table was created before the multi-user update
+  await sql`ALTER TABLE app_state ADD COLUMN IF NOT EXISTS user_id TEXT NOT NULL DEFAULT 'legacy_user'`;
+  
+  // Safe drop and recreate of primary key to ensure (user_id, key) is the new PK
+  try {
+    await sql`ALTER TABLE app_state DROP CONSTRAINT app_state_pkey`;
+    await sql`ALTER TABLE app_state ADD PRIMARY KEY (user_id, key)`;
+  } catch (e) {
+    // Constraint might not be named 'app_state_pkey' or it might already be updated
+  }
+
   return sql;
 }
 

@@ -42,6 +42,10 @@ async function getDB() {
       created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+
+  // Add user_id column if the table already existed before the multi-user update
+  await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS user_id TEXT NOT NULL DEFAULT 'legacy_user'`;
+
   return sql;
 }
 
