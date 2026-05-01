@@ -76,6 +76,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ── POST ───────────────────────────────────────────────────────────────────
     if (req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      console.log('[API POST] Body received:', JSON.stringify(body));
 
       // Hybrid Auth: If no Clerk token, check if the request has the TRANSACTIONS_SECRET
       if (!userId) {
@@ -88,19 +89,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const id = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      let amountStr = String(body.amount || '0');
-      // More robust parsing: remove anything that isn't a digit, dot or comma
-      amountStr = amountStr.replace(/[^\d.,]/g, '');
-      // Handle Spanish/Colombian format: 470.000,00 -> 470000.00
-      // If there's a comma and a dot, the dot is thousands and comma is decimal.
-      if (amountStr.includes('.') && amountStr.includes(',')) {
-        amountStr = amountStr.replace(/\./g, '').replace(',', '.');
-      } else if (amountStr.includes(',')) {
-        // If only comma, it might be decimal
-        amountStr = amountStr.replace(',', '.');
-      }
+      let amountStr = String(body.amount || '0').trim();
       
+      // Parsing logic for amounts (handle COP 10.000, 10.000,00, $10,000.00, etc.)
+      // 1. Remove currency symbols and spaces
+      amountStr = amountStr.replace(/[^\d.,-]/g, '');
+      
+      const lastDot = amountStr.lastIndexOf('.');
+      const lastComma = amountStr.lastIndexOf(',');
+      
+      if (lastComma > lastDot) {
+        // Format like 1.234,56 (European/Latin)
+        amountStr = amountStr.replace(/\./g, '').replace(',', '.');
+      } else if (lastDot > lastComma) {
+        // Format like 1,234.56 (US) OR 10.000 (COP thousands)
+        // If it's a single dot and followed by 3 digits, it's likely a thousand in COP
+        const parts = amountStr.split('.');
+        if (parts.length === 2 && parts[1].length === 3 && !amountStr.includes(',')) {
+          amountStr = amountStr.replace('.', '');
+        } else {
+          amountStr = amountStr.replace(/,/g, '');
+        }
+      } else if (lastComma !== -1) {
+        // Just a comma: 10,00 (decimal) or 10,000 (thousand)
+        const parts = amountStr.split(',');
+        if (parts.length === 2 && parts[1].length === 3) {
+          amountStr = amountStr.replace(',', '');
+        } else {
+          amountStr = amountStr.replace(',', '.');
+        }
+      }
+
       const amount = parseFloat(amountStr) || 0;
+      console.log('[API POST] Parsed amount:', amount, 'from string:', amountStr);
       const merchant = body.merchant || 'Desconocido';
       const date = body.date ? new Date(body.date) : new Date();
       const currency = body.currency || 'COP';
