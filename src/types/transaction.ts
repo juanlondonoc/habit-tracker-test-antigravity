@@ -6,7 +6,7 @@ export interface Transaction {
   currency: string;
   category: string;
   note: string;
-  source: 'apple_pay' | 'manual';
+  source: 'apple_pay' | 'manual' | 'sms_bank' | 'sms_income';
 }
 
 export const CATEGORIES = [

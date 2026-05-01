@@ -534,6 +534,8 @@ export function TransactionsDashboard() {
                     <p className="text-xs text-gray-500">
                       {format(parseISO(tx.date), "d MMM · HH:mm", { locale: es })}
                       {tx.source === 'apple_pay' && <span className="ml-1 text-primary/60 font-semibold">· Apple Pay</span>}
+                      {tx.source === 'sms_bank' && <span className="ml-1 text-blue-400/60 font-semibold">· SMS Banco</span>}
+                      {tx.source === 'sms_income' && <span className="ml-1 text-emerald-400/60 font-semibold">· Ingreso SMS</span>}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
