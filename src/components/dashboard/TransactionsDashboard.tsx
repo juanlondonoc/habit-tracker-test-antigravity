@@ -290,6 +290,7 @@ export function TransactionsDashboard() {
   }, [filteredTxs, totalSpend]);
 
   // Chart data
+  const now = new Date();
   const days = eachDayOfInterval({ start: startOfMonth(now), end: endOfMonth(now) });
   const chartData = days.map((d) => ({
     label: format(d, 'd', { locale: es }),
