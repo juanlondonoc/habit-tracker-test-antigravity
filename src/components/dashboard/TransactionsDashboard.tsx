@@ -165,7 +165,7 @@ export function TransactionsDashboard() {
   const [tempBudget, setTempBudget] = useState(budget.toString());
 
   useEffect(() => {
-    getToken().then(token => {
+    getToken().then((token: string | null) => {
       fetch('/api/state?key=habitcore_budget', {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       })
