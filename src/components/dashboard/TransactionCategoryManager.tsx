@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, X, Check } from 'lucide-react';
+import { Plus, Trash2, X } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -20,7 +20,7 @@ const PRESET_COLORS = [
 export const TransactionCategoryManager: React.FC<{ 
   onClose: () => void, 
   onUpdate: () => void 
-}> = ({ onClose, onUpdate }) => {
+}> = ({ onUpdate }) => {
   const { getToken } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
