@@ -3,7 +3,7 @@ import {
   PlusCircle, ShoppingBag, Car, UtensilsCrossed, Film,
   Heart, BookOpen, Smartphone, Zap, MoreHorizontal,
   Trash2, X, TrendingDown, Wallet, RefreshCw, Calendar,
-  Target,
+  Target, Settings2
 } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import {
@@ -15,6 +15,8 @@ import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'rechar
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { Transaction, CATEGORIES } from '../../types/transaction';
+import { Modal } from '../ui/modal';
+import { TransactionCategoryManager } from './TransactionCategoryManager';
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Comida: UtensilsCrossed,
@@ -37,8 +39,11 @@ function fmt(amount: number, currency = 'COP') {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 }
 
-function getCat(name: string) {
-  return CATEGORIES.find((c) => c.name === name) ?? CATEGORIES[CATEGORIES.length - 1];
+interface TxCategory {
+  id: string;
+  name: string;
+  color: string;
+  icon: string;
 }
 
 // ── Transaction Form Modal (Add or Edit) ──────────────────────────────────────
@@ -46,15 +51,17 @@ interface TransactionFormModalProps {
   onClose: () => void;
   onSuccess: (tx: Transaction) => void;
   initialData?: Transaction;
+  categories: TxCategory[];
+  onOpenManager: () => void;
 }
 
-function TransactionFormModal({ onClose, onSuccess, initialData }: TransactionFormModalProps) {
+function TransactionFormModal({ onClose, onSuccess, initialData, categories, onOpenManager }: TransactionFormModalProps) {
   const { getToken } = useAuth();
   const [form, setForm] = useState({
     id: initialData?.id || '',
     amount: initialData?.amount.toString() || '',
     merchant: initialData?.merchant || '',
-    category: initialData?.category || 'Otros',
+    category: initialData?.category || (categories[0]?.name || 'Otros'),
     currency: initialData?.currency || 'COP',
     note: initialData?.note || '',
     date: initialData?.date || new Date().toISOString(),
@@ -89,8 +96,6 @@ function TransactionFormModal({ onClose, onSuccess, initialData }: TransactionFo
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       
-      // For editing, we might not get the full object back, or just success. 
-      // Let's assume we want to update the local state.
       onSuccess(isEdit ? { ...initialData, ...form, amount: parseFloat(form.amount) || 0 } : data.transaction);
       onClose();
     } catch (err) {
@@ -141,10 +146,16 @@ function TransactionFormModal({ onClose, onSuccess, initialData }: TransactionFo
           </div>
 
           <div>
-            <label className="text-xs text-gray-400 mb-1 block">Categoría</label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-xs text-gray-400 block">Categoría</label>
+              <button type="button" onClick={onOpenManager} className="text-[10px] text-primary hover:underline flex items-center gap-1">
+                <Settings2 className="w-2.5 h-2.5" /> Gestionar
+              </button>
+            </div>
             <select value={form.category} onChange={set('category')}
               className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-primary/50 text-base">
-              {CATEGORIES.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+              {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+              {categories.length === 0 && CATEGORIES.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
             </select>
           </div>
 
@@ -169,14 +180,29 @@ function TransactionFormModal({ onClose, onSuccess, initialData }: TransactionFo
 export function TransactionsDashboard() {
   const { getToken } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [userCategories, setUserCategories] = useState<TxCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [showManager, setShowManager] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   
   const [budget, setBudget] = useState(2000000);
   const [isEditingBudget, setIsEditingBudget] = useState(false);
   const [tempBudget, setTempBudget] = useState(budget.toString());
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const token = await getToken();
+      const res = await fetch('/api/categories', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      setUserCategories(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [getToken]);
 
   useEffect(() => {
     getToken().then((token: string | null) => {
@@ -192,7 +218,8 @@ export function TransactionsDashboard() {
         })
         .catch(console.error);
     });
-  }, [getToken]);
+    fetchCategories();
+  }, [getToken, fetchCategories]);
 
   // Filters
   const [filter, setFilter] = useState<'current' | 'prev' | '7d'>('current');
@@ -257,6 +284,21 @@ export function TransactionsDashboard() {
       }
       return [tx, ...prev];
     });
+  };
+
+  const getCatInfo = (name: string) => {
+    const userCat = userCategories.find(c => c.name === name);
+    if (userCat) {
+      return { 
+        name: userCat.name, 
+        color: 'text-white', 
+        bg: 'border-white/10', 
+        hex: userCat.color,
+        icon: ICON_MAP[userCat.icon] || MoreHorizontal 
+      };
+    }
+    const defaultCat = CATEGORIES.find((c) => c.name === name) ?? CATEGORIES[CATEGORIES.length - 1];
+    return { ...defaultCat, icon: ICON_MAP[name] || MoreHorizontal };
   };
 
   // Filtered transactions
@@ -405,14 +447,14 @@ export function TransactionsDashboard() {
         ) : (
           <div className="space-y-4">
             {catBreakdown.map(cat => {
-              const info = getCat(cat.name);
-              const Icon = ICON_MAP[cat.name] || MoreHorizontal;
+              const info = getCatInfo(cat.name);
+              const Icon = info.icon;
               return (
                 <div key={cat.name} className="space-y-1.5">
                   <div className="flex justify-between items-center text-xs">
                     <div className="flex items-center gap-2">
-                      <div className={cn("w-6 h-6 rounded-lg flex items-center justify-center", info.bg)}>
-                        <Icon className={cn("w-3 h-3", info.color)} />
+                      <div className={cn("w-6 h-6 rounded-lg flex items-center justify-center border", info.bg)} style={!info.bg.includes('bg-') ? {backgroundColor: `${info.hex}20`} : {}}>
+                        <Icon className={cn("w-3 h-3", info.color)} style={info.color === 'text-white' ? {color: info.hex} : {}} />
                       </div>
                       <span className="text-gray-300">{cat.name}</span>
                     </div>
@@ -476,16 +518,16 @@ export function TransactionsDashboard() {
         ) : (
           <ul className="divide-y divide-white/5">
             {filteredTxs.slice(0, 30).map((tx) => {
-              const cat = getCat(tx.category);
-              const Icon = ICON_MAP[tx.category] ?? MoreHorizontal;
+              const info = getCatInfo(tx.category);
+              const Icon = info.icon;
               return (
                 <li 
                   key={tx.id} 
                   className="flex items-center gap-3 px-5 py-4 hover:bg-white/[0.04] transition-colors group cursor-pointer"
                   onClick={() => setEditingTx(tx)}
                 >
-                  <div className={cn('w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 border', cat.bg)}>
-                    <Icon className={cn('w-5 h-5', cat.color)} />
+                  <div className={cn('w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 border', info.bg)} style={!info.bg.includes('bg-') ? {backgroundColor: `${info.hex}20`} : {}}>
+                    <Icon className={cn('w-5 h-5', info.color)} style={info.color === 'text-white' ? {color: info.hex} : {}} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white truncate">{tx.merchant}</p>
@@ -513,11 +555,17 @@ export function TransactionsDashboard() {
       
       {(showAdd || editingTx) && (
         <TransactionFormModal 
+          categories={userCategories}
+          onOpenManager={() => { setShowAdd(false); setEditingTx(null); setShowManager(true); }}
           initialData={editingTx || undefined}
           onClose={() => { setShowAdd(false); setEditingTx(null); }} 
           onSuccess={onUpdateSuccess} 
         />
       )}
+
+      <Modal isOpen={showManager} onClose={() => setShowManager(false)} title="Gestionar Categorías">
+        <TransactionCategoryManager onClose={() => setShowManager(false)} onUpdate={fetchCategories} />
+      </Modal>
     </div>
   );
 }
