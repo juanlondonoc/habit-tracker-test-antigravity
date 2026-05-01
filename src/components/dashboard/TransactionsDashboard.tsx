@@ -105,13 +105,13 @@ function AddModal({ onClose, onAdded }: AddModalProps) {
               <input
                 type="number" inputMode="decimal" placeholder="0"
                 value={form.amount} onChange={set('amount')} required
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-primary/50 text-sm"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-primary/50 text-base"
               />
             </div>
             <div>
               <label className="text-xs text-gray-400 mb-1 block">Moneda</label>
               <select value={form.currency} onChange={set('currency')}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-primary/50 text-sm">
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-primary/50 text-base">
                 <option value="COP">COP</option>
                 <option value="USD">USD</option>
                 <option value="EUR">EUR</option>
@@ -123,14 +123,14 @@ function AddModal({ onClose, onAdded }: AddModalProps) {
             <label className="text-xs text-gray-400 mb-1 block">Comercio *</label>
             <input type="text" placeholder="Ej: Starbucks, Rappi..."
               value={form.merchant} onChange={set('merchant')} required
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-primary/50 text-sm"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-primary/50 text-base"
             />
           </div>
 
           <div>
             <label className="text-xs text-gray-400 mb-1 block">Categoría</label>
             <select value={form.category} onChange={set('category')}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-primary/50 text-sm">
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-primary/50 text-base">
               {CATEGORIES.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
             </select>
           </div>
@@ -139,11 +139,11 @@ function AddModal({ onClose, onAdded }: AddModalProps) {
             <label className="text-xs text-gray-400 mb-1 block">Nota (opcional)</label>
             <input type="text" placeholder="Descripción opcional..."
               value={form.note} onChange={set('note')}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-primary/50 text-sm"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-primary/50 text-base"
             />
           </div>
 
-          <Button type="submit" disabled={loading} className="w-full bg-primary hover:bg-primary/90 text-white rounded-xl py-2.5">
+          <Button type="submit" disabled={loading} className="w-full bg-primary hover:bg-primary/90 text-white rounded-xl py-2.5 text-base">
             {loading ? 'Guardando...' : 'Guardar gasto'}
           </Button>
         </form>
