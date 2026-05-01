@@ -17,6 +17,38 @@ const DEFAULT_CATEGORIES: Category[] = [
     { id: 'cat-5', name: 'Mindset', color: '#EC4899' }, // Pink
 ];
 
+const SECRET = import.meta.env.VITE_TRANSACTIONS_SECRET || '';
+
+const neonStorage = {
+    getItem: async (name: string): Promise<string | null> => {
+        try {
+            const res = await fetch(`/api/state?key=${name}`);
+            const data = await res.json();
+            return data.value || null;
+        } catch {
+            return null;
+        }
+    },
+    setItem: async (name: string, value: string): Promise<void> => {
+        try {
+            await fetch('/api/state', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: name, value, token: SECRET })
+            });
+        } catch (e) {
+            console.error('Failed to sync to neon', e);
+        }
+    },
+    removeItem: async (name: string): Promise<void> => {
+        try {
+            await fetch(`/api/state?key=${name}&token=${SECRET}`, { method: 'DELETE' });
+        } catch (e) {
+            console.error('Failed to delete from neon', e);
+        }
+    },
+};
+
 export const useHabitStore = create<AppState>()(
     persist(
         (set) => ({
@@ -105,7 +137,7 @@ export const useHabitStore = create<AppState>()(
         }),
         {
             name: 'habit-tracker-storage',
-            storage: createJSONStorage(() => localStorage),
+            storage: createJSONStorage(() => neonStorage),
             // Merge initial categories if not present in persisted state
             onRehydrateStorage: () => (state) => {
                 if (state) {

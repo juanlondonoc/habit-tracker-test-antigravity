@@ -153,13 +153,21 @@ export function TransactionsDashboard() {
   const [showAdd, setShowAdd] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   
-  // Settings (Simple local budget for now)
-  const [budget, setBudget] = useState(() => {
-    const saved = localStorage.getItem('habitcore_budget');
-    return saved ? parseFloat(saved) : 2000000;
-  });
+  const [budget, setBudget] = useState(2000000);
   const [isEditingBudget, setIsEditingBudget] = useState(false);
   const [tempBudget, setTempBudget] = useState(budget.toString());
+
+  useEffect(() => {
+    fetch('/api/state?key=habitcore_budget')
+      .then(r => r.json())
+      .then(d => {
+        if (d.value) {
+          const val = parseFloat(d.value);
+          if (!isNaN(val)) setBudget(val);
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   // Filters
   const [filter, setFilter] = useState<'current' | 'prev' | '7d'>('current');
@@ -179,11 +187,16 @@ export function TransactionsDashboard() {
 
   useEffect(() => { load(); }, [load]);
 
-  const saveBudget = () => {
+  const saveBudget = async () => {
     const nb = parseFloat(tempBudget) || 0;
     setBudget(nb);
-    localStorage.setItem('habitcore_budget', nb.toString());
     setIsEditingBudget(false);
+    
+    await fetch('/api/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'habitcore_budget', value: nb.toString(), token: SECRET })
+    }).catch(console.error);
   };
 
   async function deleteTx(id: string) {
