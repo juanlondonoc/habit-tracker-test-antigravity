@@ -89,8 +89,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const id = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       let amountStr = String(body.amount || '0');
+      // More robust parsing: remove anything that isn't a digit, dot or comma
+      amountStr = amountStr.replace(/[^\d.,]/g, '');
       // Handle Spanish/Colombian format: 470.000,00 -> 470000.00
-      amountStr = amountStr.replace(/\./g, '').replace(',', '.');
+      // If there's a comma and a dot, the dot is thousands and comma is decimal.
+      if (amountStr.includes('.') && amountStr.includes(',')) {
+        amountStr = amountStr.replace(/\./g, '').replace(',', '.');
+      } else if (amountStr.includes(',')) {
+        // If only comma, it might be decimal
+        amountStr = amountStr.replace(',', '.');
+      }
+      
       const amount = parseFloat(amountStr) || 0;
       const merchant = body.merchant || 'Desconocido';
       const date = body.date ? new Date(body.date) : new Date();
@@ -106,6 +115,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const tx = { id, amount, merchant, date: date.toISOString(), currency, category, note, source };
       return res.status(201).json({ success: true, transaction: tx });
+    }
+
+    // ── PATCH / PUT (Edit) ─────────────────────────────────────────────────────
+    if (req.method === 'PATCH' || req.method === 'PUT') {
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      if (!body.id) return res.status(400).json({ error: 'Missing id' });
+
+      await sql`
+        UPDATE transactions 
+        SET 
+          merchant = ${body.merchant},
+          category = ${body.category},
+          amount = ${body.amount},
+          note = ${body.note},
+          date = ${new Date(body.date)}
+        WHERE id = ${body.id} AND user_id = ${userId}
+      `;
+      return res.status(200).json({ success: true });
     }
 
     // ── DELETE ─────────────────────────────────────────────────────────────────

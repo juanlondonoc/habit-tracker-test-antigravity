@@ -41,23 +41,28 @@ function getCat(name: string) {
   return CATEGORIES.find((c) => c.name === name) ?? CATEGORIES[CATEGORIES.length - 1];
 }
 
-// ── Add Transaction Modal ─────────────────────────────────────────────────────
-interface AddModalProps {
+// ── Transaction Form Modal (Add or Edit) ──────────────────────────────────────
+interface TransactionFormModalProps {
   onClose: () => void;
-  onAdded: (tx: Transaction) => void;
+  onSuccess: (tx: Transaction) => void;
+  initialData?: Transaction;
 }
 
-function AddModal({ onClose, onAdded }: AddModalProps) {
+function TransactionFormModal({ onClose, onSuccess, initialData }: TransactionFormModalProps) {
   const { getToken } = useAuth();
   const [form, setForm] = useState({
-    amount: '',
-    merchant: '',
-    category: 'Otros',
-    currency: 'COP',
-    note: '',
+    id: initialData?.id || '',
+    amount: initialData?.amount.toString() || '',
+    merchant: initialData?.merchant || '',
+    category: initialData?.category || 'Otros',
+    currency: initialData?.currency || 'COP',
+    note: initialData?.note || '',
+    date: initialData?.date || new Date().toISOString(),
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const isEdit = !!initialData;
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -69,16 +74,24 @@ function AddModal({ onClose, onAdded }: AddModalProps) {
     try {
       const token = await getToken();
       const res = await fetch('/api/transactions', {
-        method: 'POST',
+        method: isEdit ? 'PUT' : 'POST',
         headers: { 
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({ ...form, source: 'manual', token: SECRET, date: new Date().toISOString() }),
+        body: JSON.stringify({ 
+          ...form, 
+          amount: parseFloat(form.amount) || 0,
+          source: isEdit ? initialData.source : 'manual', 
+          token: SECRET 
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      onAdded(data.transaction);
+      
+      // For editing, we might not get the full object back, or just success. 
+      // Let's assume we want to update the local state.
+      onSuccess(isEdit ? { ...initialData, ...form, amount: parseFloat(form.amount) || 0 } : data.transaction);
       onClose();
     } catch (err) {
       setError(String(err));
@@ -91,7 +104,7 @@ function AddModal({ onClose, onAdded }: AddModalProps) {
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="w-full max-w-md bg-[#161821] border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4">
         <div className="flex items-center justify-between p-5 border-b border-white/5">
-          <h2 className="font-semibold text-white text-lg">Agregar gasto</h2>
+          <h2 className="font-semibold text-white text-lg">{isEdit ? 'Editar gasto' : 'Agregar gasto'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
@@ -144,7 +157,7 @@ function AddModal({ onClose, onAdded }: AddModalProps) {
           </div>
 
           <Button type="submit" disabled={loading} className="w-full bg-primary hover:bg-primary/90 text-white rounded-xl py-2.5 text-base">
-            {loading ? 'Guardando...' : 'Guardar gasto'}
+            {loading ? 'Guardando...' : 'Guardar cambios'}
           </Button>
         </form>
       </div>
@@ -158,6 +171,7 @@ export function TransactionsDashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   
   const [budget, setBudget] = useState(2000000);
@@ -197,7 +211,7 @@ export function TransactionsDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -235,6 +249,16 @@ export function TransactionsDashboard() {
     }
   }
 
+  const onUpdateSuccess = (tx: Transaction) => {
+    setTransactions((prev) => {
+      const exists = prev.find(p => p.id === tx.id);
+      if (exists) {
+        return prev.map(p => p.id === tx.id ? tx : p);
+      }
+      return [tx, ...prev];
+    });
+  };
+
   // Filtered transactions
   const filteredTxs = useMemo(() => {
     const now = new Date();
@@ -266,7 +290,6 @@ export function TransactionsDashboard() {
   }, [filteredTxs, totalSpend]);
 
   // Chart data
-  const now = new Date();
   const days = eachDayOfInterval({ start: startOfMonth(now), end: endOfMonth(now) });
   const chartData = days.map((d) => ({
     label: format(d, 'd', { locale: es }),
@@ -451,11 +474,15 @@ export function TransactionsDashboard() {
           </div>
         ) : (
           <ul className="divide-y divide-white/5">
-            {filteredTxs.slice(0, 15).map((tx) => {
+            {filteredTxs.slice(0, 30).map((tx) => {
               const cat = getCat(tx.category);
               const Icon = ICON_MAP[tx.category] ?? MoreHorizontal;
               return (
-                <li key={tx.id} className="flex items-center gap-3 px-5 py-4 hover:bg-white/[0.02] transition-colors group">
+                <li 
+                  key={tx.id} 
+                  className="flex items-center gap-3 px-5 py-4 hover:bg-white/[0.04] transition-colors group cursor-pointer"
+                  onClick={() => setEditingTx(tx)}
+                >
                   <div className={cn('w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 border', cat.bg)}>
                     <Icon className={cn('w-5 h-5', cat.color)} />
                   </div>
@@ -463,15 +490,15 @@ export function TransactionsDashboard() {
                     <p className="text-sm font-medium text-white truncate">{tx.merchant}</p>
                     <p className="text-xs text-gray-500">
                       {format(parseISO(tx.date), "d MMM · HH:mm", { locale: es })}
-                      {tx.source === 'apple_pay' && <span className="ml-1 text-primary/60">· Apple Pay</span>}
+                      {tx.source === 'apple_pay' && <span className="ml-1 text-primary/60 font-semibold">· Apple Pay</span>}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-bold text-white">{fmt(tx.amount, tx.currency)}</span>
                     <button
-                      onClick={() => deleteTx(tx.id)}
+                      onClick={(e) => { e.stopPropagation(); deleteTx(tx.id); }}
                       disabled={deleting === tx.id}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-xl hover:bg-red-500/20 text-gray-600 hover:text-red-400 transition-all"
+                      className="opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-xl hover:bg-red-500/20 text-gray-600 hover:text-red-400 transition-all"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -483,7 +510,13 @@ export function TransactionsDashboard() {
         )}
       </div>
       
-      {showAdd && <AddModal onClose={() => setShowAdd(false)} onAdded={(tx) => setTransactions((p) => [tx, ...p])} />}
+      {(showAdd || editingTx) && (
+        <TransactionFormModal 
+          initialData={editingTx || undefined}
+          onClose={() => { setShowAdd(false); setEditingTx(null); }} 
+          onSuccess={onUpdateSuccess} 
+        />
+      )}
     </div>
   );
 }
