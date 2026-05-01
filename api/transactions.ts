@@ -25,28 +25,7 @@ async function authenticate(req: VercelRequest) {
 async function getDB() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL not set');
-  const sql = neon(url);
-
-  // Create table if it doesn't exist, and add user_id for multi-user support
-  await sql`
-    CREATE TABLE IF NOT EXISTS transactions (
-      id          TEXT PRIMARY KEY,
-      user_id     TEXT NOT NULL DEFAULT 'legacy_user',
-      amount      NUMERIC NOT NULL,
-      merchant    TEXT NOT NULL,
-      date        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      currency    TEXT NOT NULL DEFAULT 'COP',
-      category    TEXT NOT NULL DEFAULT 'Otros',
-      note        TEXT DEFAULT '',
-      source      TEXT NOT NULL DEFAULT 'manual',
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
-
-  // Add user_id column if the table already existed before the multi-user update
-  await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS user_id TEXT NOT NULL DEFAULT 'legacy_user'`;
-
-  return sql;
+  return neon(url);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
