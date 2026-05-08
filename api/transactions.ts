@@ -68,6 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      const ENABLE_APPLE_PAY = false; // Temporarily disabled by user request
       const id = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       let merchant = body.merchant || 'Desconocido';
       let source = body.source || 'apple_pay';
@@ -77,6 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       let note = body.note || '';
 
       let amountStrFromSMS: string | null = null;
+      let smsMatched = false;
 
       // ── SMS Parsing (Bancolombia) ──────────────────────────────────────────
       if (body.text) {
@@ -95,31 +97,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           amountStrFromSMS = match[1];
           merchant = (match[2] || match[4] || 'Desconocido').trim();
           source = 'sms_bank';
+          smsMatched = true;
           console.log('[API POST] Match found (Pagaste/Transfer):', merchant, amountStrFromSMS);
         } else if ((match = text.match(pRetiraste))) {
           amountStrFromSMS = match[1];
           merchant = (match[2] || match[4] || 'Cajero/Corresponsal').trim();
           source = 'sms_bank';
+          smsMatched = true;
           console.log('[API POST] Match found (Retiro):', merchant, amountStrFromSMS);
         } else if ((match = text.match(pQR))) {
           amountStrFromSMS = match[1];
           merchant = (match[2] || match[4] || 'Código QR').trim();
           source = 'sms_bank';
+          smsMatched = true;
           console.log('[API POST] Match found (QR):', merchant, amountStrFromSMS);
         } else if ((match = text.match(pNomina))) {
           merchant = match[1].trim();
           amountStrFromSMS = match[2];
           source = 'sms_income';
           category = 'Otros'; 
+          smsMatched = true;
           console.log('[API POST] Match found (Nomina):', merchant, amountStrFromSMS);
         } else if ((match = text.match(pRecibiste))) {
           merchant = match[1].trim();
           amountStrFromSMS = match[2];
           source = 'sms_income';
+          smsMatched = true;
           console.log('[API POST] Match found (Recibiste):', merchant, amountStrFromSMS);
         } else {
-          console.log('[API POST] No SMS pattern matched the text.');
+          console.warn('[API POST] No SMS pattern matched the text:', text);
+          return res.status(422).json({ error: 'SMS format not recognized', text });
         }
+      } else if (!ENABLE_APPLE_PAY && source === 'apple_pay') {
+        console.log('[API POST] Apple Pay request rejected (disabled)');
+        return res.status(403).json({ error: 'Apple Pay is currently disabled' });
       }
 
       // ── Amount Parsing ─────────────────────────────────────────────────────
@@ -155,6 +166,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         amount = parseFloat(amountStr) || 0;
       }
+
+      if (amount === 0 && source !== 'manual') {
+        console.warn('[API POST] Rejecting transaction with 0 amount');
+        return res.status(422).json({ error: 'Invalid amount (0)' });
+      }
+
       console.log('[API POST] Final parsed amount:', amount);
 
       // ── Deduplication Logic (5-minute window) ──────────────────────────────
