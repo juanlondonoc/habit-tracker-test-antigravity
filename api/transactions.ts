@@ -1,3 +1,4 @@
+// Build trigger: 2026-05-08T10:58:15
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
 import { verifyToken } from '@clerk/backend';
