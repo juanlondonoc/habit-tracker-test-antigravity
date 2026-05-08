@@ -68,7 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      const ENABLE_APPLE_PAY = false; // Temporarily disabled by user request
+      const ENABLE_APPLE_PAY = false; 
       const id = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       let merchant = body.merchant || 'Desconocido';
       let source = body.source || 'apple_pay';
@@ -82,50 +82,56 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ── SMS Parsing (Bancolombia) ──────────────────────────────────────────
       if (body.text) {
-        const text = body.text;
-        console.log('[API POST] Parsing SMS:', text);
+        const rawText = body.text;
+        const text = rawText.replace(/\s+/g, ' ').trim();
+        console.log('[API POST] Parsing Normalized SMS:', text);
         
-        const pPagaste = /Pagaste \$([\d.,]+) (?:a (.*?) desde|desde (.*?) a (.*?))/i;
-        const pRetiraste = /Retiraste \$([\d.,]+) (?:en (.*?) de|de (.*?) en (.*?))/i;
-        const pTransferiste = /transferiste \$([\d.,]+) (?:a (.*?) desde|desde (.*?) a (.*?))/i;
-        const pQR = /pagaste \$([\d.,]+) por codigo QR .*? (?:a (.*?) el|desde (.*?) a (.*?) el)/i;
-        const pNomina = /pago de Nomina de (.*?) por \$([\d.,]+)/i;
-        const pRecibiste = /recibiste una transferencia de (.*?) por \$([\d.,]+)/i;
+        const pPagaste = /Pagaste \$?([\d.,]+) (?:a (.*?) desde|desde (.*?) a (.*?))/i;
+        const pRetiraste = /Retiraste \$?([\d.,]+) (?:en (.*?) de|de (.*?) en (.*?))/i;
+        const pTransferiste = /transferiste \$?([\d.,]+) (?:a (.*?) desde|desde (.*?) a (.*?))/i;
+        const pQR = /pagaste \$?([\d.,]+) por codigo QR .*? (?:a (.*?) el|desde (.*?) a (.*?) el)/i;
+        const pNomina = /pago de Nomina de (.*?) por \$?([\d.,]+)/i;
+        const pRecibiste = /recibiste una transferencia de (.*?) por \$?([\d.,]+)/i;
 
         let match;
         if ((match = text.match(pPagaste)) || (match = text.match(pTransferiste))) {
           amountStrFromSMS = match[1];
-          merchant = (match[2] || match[4] || 'Desconocido').trim();
+          const candidate1 = match[2];
+          const candidate2 = match[4];
+          merchant = (candidate1 || candidate2 || 'Desconocido').trim();
+          if (merchant.toLowerCase().includes('cuenta') && (candidate1 && candidate2)) {
+            merchant = (candidate1.toLowerCase().includes('cuenta') ? candidate2 : candidate1).trim();
+          }
           source = 'sms_bank';
           smsMatched = true;
-          console.log('[API POST] Match found (Pagaste/Transfer):', merchant, amountStrFromSMS);
         } else if ((match = text.match(pRetiraste))) {
           amountStrFromSMS = match[1];
           merchant = (match[2] || match[4] || 'Cajero/Corresponsal').trim();
           source = 'sms_bank';
           smsMatched = true;
-          console.log('[API POST] Match found (Retiro):', merchant, amountStrFromSMS);
         } else if ((match = text.match(pQR))) {
           amountStrFromSMS = match[1];
           merchant = (match[2] || match[4] || 'Código QR').trim();
           source = 'sms_bank';
           smsMatched = true;
-          console.log('[API POST] Match found (QR):', merchant, amountStrFromSMS);
         } else if ((match = text.match(pNomina))) {
           merchant = match[1].trim();
           amountStrFromSMS = match[2];
           source = 'sms_income';
           category = 'Otros'; 
           smsMatched = true;
-          console.log('[API POST] Match found (Nomina):', merchant, amountStrFromSMS);
         } else if ((match = text.match(pRecibiste))) {
           merchant = match[1].trim();
           amountStrFromSMS = match[2];
           source = 'sms_income';
           smsMatched = true;
-          console.log('[API POST] Match found (Recibiste):', merchant, amountStrFromSMS);
+        }
+
+        if (smsMatched) {
+          console.log('[API POST] Match found:', merchant, amountStrFromSMS);
         } else {
           console.warn('[API POST] No SMS pattern matched the text:', text);
+          if (text.toLowerCase().includes('transferiste')) console.log('DEBUG: "Transferiste" was present but regex failed.');
           return res.status(422).json({ error: 'SMS format not recognized', text });
         }
       } else if (!ENABLE_APPLE_PAY && source === 'apple_pay') {
@@ -143,10 +149,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } else if (rawAmount) {
         let amountStr = String(rawAmount).trim();
         amountStr = amountStr.replace(/[^\d.,-]/g, '');
-        
         const lastDot = amountStr.lastIndexOf('.');
         const lastComma = amountStr.lastIndexOf(',');
-
         if (lastComma > lastDot) {
           amountStr = amountStr.replace(/\./g, '').replace(',', '.');
         } else if (lastDot > lastComma) {
