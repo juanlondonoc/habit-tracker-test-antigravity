@@ -60,15 +60,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Hybrid Auth: If no Clerk token, check if the request has the TRANSACTIONS_SECRET
       if (!userId) {
         if (SECRET && body.token === SECRET) {
-          // Allowed via Secret (for Apple Pay shortcut). Require a user_id to be passed, or fallback.
           userId = body.user_id || 'legacy_user';
+          console.log('[API POST] Auth successful via Token for user:', userId);
         } else {
+          console.warn('[API POST] Unauthorized: Secret token mismatch or missing');
           return res.status(401).json({ error: 'Unauthorized' });
         }
       }
 
       const id = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      let amountStr = String(body.amount || '0').trim();
       let merchant = body.merchant || 'Desconocido';
       let source = body.source || 'apple_pay';
       let date = body.date ? new Date(body.date) : new Date();
@@ -76,62 +76,88 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       let category = body.category || 'Otros';
       let note = body.note || '';
 
+      let amountStrFromSMS: string | null = null;
+
       // ── SMS Parsing (Bancolombia) ──────────────────────────────────────────
       if (body.text) {
         const text = body.text;
         console.log('[API POST] Parsing SMS:', text);
         
-        // Patterns
-        const pPagaste = /Pagaste \$([\d.,]+) a (.*?) desde/i;
-        const pRetiraste = /Retiraste \$([\d.,]+) en (.*?) de/i;
-        const pTransferiste = /transferiste \$([\d.,]+) a (.*?) desde/i;
-        const pQR = /pagaste \$([\d.,]+) por codigo QR .*? a (.*?) el/i;
+        const pPagaste = /Pagaste \$([\d.,]+) (?:a (.*?) desde|desde (.*?) a (.*?))/i;
+        const pRetiraste = /Retiraste \$([\d.,]+) (?:en (.*?) de|de (.*?) en (.*?))/i;
+        const pTransferiste = /transferiste \$([\d.,]+) (?:a (.*?) desde|desde (.*?) a (.*?))/i;
+        const pQR = /pagaste \$([\d.,]+) por codigo QR .*? (?:a (.*?) el|desde (.*?) a (.*?) el)/i;
         const pNomina = /pago de Nomina de (.*?) por \$([\d.,]+)/i;
         const pRecibiste = /recibiste una transferencia de (.*?) por \$([\d.,]+)/i;
 
         let match;
-        if ((match = text.match(pPagaste)) || (match = text.match(pRetiraste)) || (match = text.match(pTransferiste)) || (match = text.match(pQR))) {
-          amountStr = match[1];
-          merchant = match[2].trim();
+        if ((match = text.match(pPagaste)) || (match = text.match(pTransferiste))) {
+          amountStrFromSMS = match[1];
+          merchant = (match[2] || match[4] || 'Desconocido').trim();
           source = 'sms_bank';
+          console.log('[API POST] Match found (Pagaste/Transfer):', merchant, amountStrFromSMS);
+        } else if ((match = text.match(pRetiraste))) {
+          amountStrFromSMS = match[1];
+          merchant = (match[2] || match[4] || 'Cajero/Corresponsal').trim();
+          source = 'sms_bank';
+          console.log('[API POST] Match found (Retiro):', merchant, amountStrFromSMS);
+        } else if ((match = text.match(pQR))) {
+          amountStrFromSMS = match[1];
+          merchant = (match[2] || match[4] || 'Código QR').trim();
+          source = 'sms_bank';
+          console.log('[API POST] Match found (QR):', merchant, amountStrFromSMS);
         } else if ((match = text.match(pNomina))) {
           merchant = match[1].trim();
-          amountStr = match[2];
+          amountStrFromSMS = match[2];
           source = 'sms_income';
-          category = 'Otros'; // Or "Ingresos" if we add it
+          category = 'Otros'; 
+          console.log('[API POST] Match found (Nomina):', merchant, amountStrFromSMS);
         } else if ((match = text.match(pRecibiste))) {
           merchant = match[1].trim();
-          amountStr = match[2];
+          amountStrFromSMS = match[2];
           source = 'sms_income';
+          console.log('[API POST] Match found (Recibiste):', merchant, amountStrFromSMS);
+        } else {
+          console.log('[API POST] No SMS pattern matched the text.');
         }
       }
 
       // ── Amount Parsing ─────────────────────────────────────────────────────
-      // Remove currency symbols and spaces
-      amountStr = amountStr.replace(/[^\d.,-]/g, '');
-      const lastDot = amountStr.lastIndexOf('.');
-      const lastComma = amountStr.lastIndexOf(',');
-      if (lastComma > lastDot) {
-        amountStr = amountStr.replace(/\./g, '').replace(',', '.');
-      } else if (lastDot > lastComma) {
-        const parts = amountStr.split('.');
-        if (parts.length === 2 && parts[1].length === 3 && !amountStr.includes(',')) {
-          amountStr = amountStr.replace('.', '');
-        } else {
-          amountStr = amountStr.replace(/,/g, '');
+      let amount = 0;
+      const rawAmount = amountStrFromSMS ?? body.amount ?? body.value ?? body.monto; 
+      console.log('[API POST] Raw amount received:', rawAmount, `(Type: ${typeof rawAmount})`);
+
+      if (typeof rawAmount === 'number') {
+        amount = rawAmount;
+      } else if (rawAmount) {
+        let amountStr = String(rawAmount).trim();
+        amountStr = amountStr.replace(/[^\d.,-]/g, '');
+        
+        const lastDot = amountStr.lastIndexOf('.');
+        const lastComma = amountStr.lastIndexOf(',');
+
+        if (lastComma > lastDot) {
+          amountStr = amountStr.replace(/\./g, '').replace(',', '.');
+        } else if (lastDot > lastComma) {
+          const parts = amountStr.split('.');
+          if (parts.length === 2 && parts[1].length === 3 && !amountStr.includes(',')) {
+            amountStr = amountStr.replace('.', '');
+          } else {
+            amountStr = amountStr.replace(/,/g, '');
+          }
+        } else if (lastComma !== -1) {
+          const parts = amountStr.split(',');
+          if (parts.length === 2 && parts[1].length === 3) {
+            amountStr = amountStr.replace(',', '');
+          } else {
+            amountStr = amountStr.replace(',', '.');
+          }
         }
-      } else if (lastComma !== -1) {
-        const parts = amountStr.split(',');
-        if (parts.length === 2 && parts[1].length === 3) {
-          amountStr = amountStr.replace(',', '');
-        } else {
-          amountStr = amountStr.replace(',', '.');
-        }
+        amount = parseFloat(amountStr) || 0;
       }
-      const amount = parseFloat(amountStr) || 0;
+      console.log('[API POST] Final parsed amount:', amount);
 
       // ── Deduplication Logic (5-minute window) ──────────────────────────────
-      // If amount is the same and within 5 mins, skip.
       const fiveMinsAgo = new Date(date.getTime() - 5 * 60 * 1000);
       const fiveMinsAfter = new Date(date.getTime() + 5 * 60 * 1000);
 
