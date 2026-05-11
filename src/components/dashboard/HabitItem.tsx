@@ -8,6 +8,8 @@ import { Button } from '../ui/button';
 import { Modal } from '../ui/modal';
 import { HabitForm } from './HabitForm';
 import { format } from 'date-fns';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface HabitItemProps {
     habit: Habit;
@@ -19,6 +21,22 @@ export const HabitItem: React.FC<HabitItemProps> = ({ habit, selectedDate, showA
     const { logs, categories, toggleBinaryLog, setQuantitativeLog, deleteHabit } = useHabitStore();
     const [isEditing, setIsEditing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging
+    } = useSortable({ id: habit.id, disabled: !showActions });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 50 : undefined,
+        opacity: isDragging ? 0.5 : 1,
+    };
 
     const category = categories.find(c => c.id === habit.categoryId);
     const color = category?.color || '#6B7280'; // Gray-500 default
@@ -37,12 +55,20 @@ export const HabitItem: React.FC<HabitItemProps> = ({ habit, selectedDate, showA
     const completed = isCompleted(habit, currentLogValue);
 
     return (
-        <div className={cn(
-            "group relative flex items-center justify-between p-3 rounded-2xl bg-[#161821] border transition-all duration-200",
-            completed && !showActions
-                ? "border-emerald-500/20 bg-emerald-500/5"
-                : "border-white/5 hover:border-white/10"
-        )}>
+        <div
+            ref={setNodeRef}
+            style={style}
+            {...attributes}
+            {...listeners}
+            className={cn(
+                "group relative flex items-center justify-between p-3 rounded-2xl bg-[#161821] border transition-all duration-200",
+                completed && !showActions
+                    ? "border-emerald-500/20 bg-emerald-500/5"
+                    : "border-white/5 hover:border-white/10",
+                showActions && "cursor-grab active:cursor-grabbing touch-none",
+                isDragging && "shadow-2xl shadow-black/50 border-primary/50"
+            )}
+        >
             {/* Visual Color Indicator strip */}
             <div
                 className="absolute left-0 top-3 bottom-3 w-1 rounded-r-full"

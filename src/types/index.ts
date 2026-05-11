@@ -37,4 +37,5 @@ export interface AppState {
     deleteCategory: (id: string) => void;
     toggleBinaryLog: (date: string, habitId: string) => void;
     setQuantitativeLog: (date: string, habitId: string, value: number) => void;
+    reorderHabits: (habits: Habit[]) => void;
 }

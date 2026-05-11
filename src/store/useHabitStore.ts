@@ -154,6 +154,9 @@ export const useHabitStore = create<AppState>()(
                     };
                 });
             },
+            reorderHabits: (habits) => {
+                set({ habits });
+            },
         }),
         {
             name: 'habit-tracker-storage',
