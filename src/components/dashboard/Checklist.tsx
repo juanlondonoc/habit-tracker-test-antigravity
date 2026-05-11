@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { useHabitStore } from '../../store/useHabitStore';
 import { Button } from '../ui/button';
 import { Modal } from '../ui/modal';
-import { HabitForm } from './HabitForm';
 import { HabitItem } from './HabitItem';
+import { HabitManager } from './HabitManager';
 
 
 interface ChecklistProps {
@@ -13,14 +13,14 @@ interface ChecklistProps {
 
 export const Checklist: React.FC<ChecklistProps> = ({ selectedDate }) => {
     const { habits } = useHabitStore();
-    const [isCreating, setIsCreating] = useState(false);
+    const [isManaging, setIsManaging] = useState(false);
 
     return (
         <div className="bg-card/50 rounded-3xl p-6 border border-white/5 h-full flex flex-col">
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold">Mis Hábitos</h2>
-                <Button onClick={() => setIsCreating(true)} className="gap-2">
-                    <Plus className="w-4 h-4" /> Nuevo
+                <Button onClick={() => setIsManaging(true)} variant="secondary" className="gap-2">
+                    <Settings className="w-4 h-4" /> Gestionar
                 </Button>
             </div>
 
@@ -28,7 +28,7 @@ export const Checklist: React.FC<ChecklistProps> = ({ selectedDate }) => {
                 {habits.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-48 text-gray-500 border-2 border-dashed border-gray-800 rounded-2xl">
                         <p>No tienes hábitos aún.</p>
-                        <Button variant="ghost" onClick={() => setIsCreating(true)} className="mt-2 text-primary">
+                        <Button variant="ghost" onClick={() => setIsManaging(true)} className="mt-2 text-primary">
                             Crear el primero
                         </Button>
                     </div>
@@ -44,11 +44,11 @@ export const Checklist: React.FC<ChecklistProps> = ({ selectedDate }) => {
             </div>
 
             <Modal
-                isOpen={isCreating}
-                onClose={() => setIsCreating(false)}
-                title="Crear Nuevo Hábito"
+                isOpen={isManaging}
+                onClose={() => setIsManaging(false)}
+                title="Gestionar Hábitos"
             >
-                <HabitForm onClose={() => setIsCreating(false)} />
+                <HabitManager onClose={() => setIsManaging(false)} />
             </Modal>
         </div>
     );
